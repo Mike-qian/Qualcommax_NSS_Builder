@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 env:
-  UPSTREAM_REPO: JuliusBairaktaris/openwrt-ppe-nss
+  UPSTREAM_REPO: Mike-qian/openwrt-ppe-nss
   UPSTREAM_REF: ppe-nss
   NSS_REPO: JuliusBairaktaris/nss-packages
   NSS_REF: edma-nss
@@ -156,7 +156,7 @@ jobs:
         # One entry per devices/<name>/ directory. The memory-profile groups exist
         # because the ath11k memory profile is compile-time and image-wide, so
         # boards can only share a build when they share a profile.
-        device: [xiaomi_ax3600, ipq807x-1g, ipq807x-512m, ipq807x-256m, ipq60xx-1g, ipq60xx-512m]
+        device: [xiaomi_ax3600]
     env:
       GH_TOKEN: ${{ github.token }}
       DEVICE: ${{ matrix.device }}
