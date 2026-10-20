@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 # Customize a checked-out OpenWrt tree before the build:
 #   1. raise the netfilter connection-tracking limit to 65535
-#   2. add the Argon theme and HomeProxy feeds (argon, homeproxy)
-#   3. add the Chinese LuCI translations, the Argon theme and HomeProxy to
-#      the shared config
+#   2. turn on Simplified Chinese for every LuCI package in the shared config
 #
-# Runs over the freshly checked-out source, before prepare-build.sh: the
-# feeds land in feeds.conf early enough for the `feeds update/install -a`
-# and `make defconfig` there, so their packages resolve into .config and can
-# be selected like any other. The conntrack files ride the image from here
-# on, and the shared config in the builder repo gains the LuCI extras.
-# Idempotent - re-running changes nothing.
+# Runs over the freshly checked-out source, before prepare-build.sh. The
+# conntrack files ride the image from here on, and the shared config in the
+# builder repo gains the LuCI language selection. Idempotent - re-running
+# changes nothing.
 #
 # Required env:
 #   OPENWRT_DIR   path to the checked-out OpenWrt source
@@ -34,16 +30,6 @@ append_config() {
 : "${OPENWRT_DIR:?OPENWRT_DIR required}"
 
 CONNTRACK_MAX=65535
-
-# Upstream feeds for the extra packages. Both are single-package repos, so
-# one feed line is one package:
-#   argon     - jerrykuku's LuCI theme (luci-theme-argon)
-#   homeproxy - ImmortalWrt's proxy platform (luci-app-homeproxy, powered
-#               by sing-box), pinned to its dev branch
-FEEDS=(
-  "argon https://github.com/jerrykuku/luci-theme-argon.git"
-  "homeproxy https://github.com/immortalwrt/homeproxy.git;dev"
-)
 
 # The builder repo, from this script's own path: the shared config below is
 # edited there. Resolved before the cd, which turns the relative $0 form
@@ -92,35 +78,12 @@ exit 0
 EOF
 chmod 0755 files/etc/uci-defaults/98-conntrack-max
 
-# 2. Argon theme and HomeProxy feeds.
-[[ -f feeds.conf ]] || cp feeds.conf.default feeds.conf
-
-for entry in "${FEEDS[@]}"; do
-  read -r name url <<<"$entry"
-  line="src-git ${name} ${url}"
-  if grep -qxF "$line" feeds.conf; then
-    log::info "Feed $name already in feeds.conf"
-  else
-    log::info "Adding feed: $line"
-    # A feed of the same name is replaced, so a fork can stand in for a
-    # default one - the same rule prepare-build.sh applies to FEEDS.
-    sed -i -E "/^src-\S+[[:space:]]+${name}[[:space:]]/d" feeds.conf
-    printf '%s\n' "$line" >>feeds.conf
-  fi
-  # Update + install this feed alone; the default feeds are prepare-build's
-  # business. Installing makes the packages selectable in .config - nothing
-  # is built unless a config line picks it.
-  log::info "Updating + installing feed: $name"
-  ./scripts/feeds update "$name"
-  ./scripts/feeds install -a -p "$name"
-done
-
-# 3. Chinese LuCI translations, the Argon theme and HomeProxy.
-# Package selections in the shared config, so every board gets them; they are
-# added here so the package list sits with the rest of the build's
-# customizations. The symbols must exist when prepare-build.sh runs
-# `make defconfig` and checks them, which is why this comes after the feeds
-# above: the theme ships in jerrykuku's own feed, HomeProxy in its own.
+# 2. Chinese for every LuCI package.
+# Package selection in the shared config, so every board gets it; it is added
+# here so the package list sits with the rest of the build's customizations.
+# The symbol must exist when prepare-build.sh runs `make defconfig` and checks
+# it: it lives in luci-base's config, so it is there as long as luci is
+# selected - no extra feed needed.
 #
 # Current LuCI has no standalone language packages: every package with a po/
 # tree generates hidden luci-i18n-<app>-<locale> subpackages whose default is
@@ -138,10 +101,8 @@ BUILDER_CONFIG="$BUILDER_DIR/devices/common/config"
 
 CONFIG_LINES=(
   "CONFIG_LUCI_LANG_zh_Hans=y"
-  "CONFIG_PACKAGE_luci-theme-argon=y"
-  "CONFIG_PACKAGE_luci-app-homeproxy=y"
 )
-marker='# Chinese LuCI translations, Argon and HomeProxy (customize-openwrt.sh)'
+marker='# Chinese for every LuCI package (customize-openwrt.sh)'
 for line in "${CONFIG_LINES[@]}"; do
   if grep -qxF "$line" "$BUILDER_CONFIG"; then
     log::info "$line already in devices/common/config"

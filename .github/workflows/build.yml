@@ -189,9 +189,9 @@ jobs:
         with:
           path: builder
 
-      # Runs before prepare-build.sh so the Argon and HomeProxy feeds are
-      # updated and installed with the default ones: their packages then
-      # resolve into .config and can be selected like any other. The
+      # Runs before prepare-build.sh: it writes the conntrack limit files
+      # into the tree and adds the LuCI language selection to the shared
+      # config, both of which prepare-build.sh then builds on. The
       # conntrack files ride the image from here on.
       - name: Customize OpenWrt source
         env:
