@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Customize a checked-out OpenWrt tree before the build:
 #   1. raise the netfilter connection-tracking limit to 65535
-#   2. add the kenzok8 package feeds (kenzo, small)
-#   3. add the Chinese LuCI translations and the Argon theme to the shared
-#      config
+#   2. add the Argon theme and HomeProxy feeds (argon, homeproxy)
+#   3. add the Chinese LuCI translations, the Argon theme and HomeProxy to
+#      the shared config
 #
 # Runs over the freshly checked-out source, before prepare-build.sh: the
 # feeds land in feeds.conf early enough for the `feeds update/install -a`
@@ -35,12 +35,14 @@ append_config() {
 
 CONNTRACK_MAX=65535
 
-# kenzok8's feeds. `small` (ssr/passwall/homeproxy/mihomo and their
-# dependencies) is meant to sit next to `kenzo` (openwrt-packages), so both
-# are added; the names match kenzok8's own feeds.conf lines.
+# Upstream feeds for the extra packages. Both are single-package repos, so
+# one feed line is one package:
+#   argon     - jerrykuku's LuCI theme (luci-theme-argon)
+#   homeproxy - ImmortalWrt's proxy platform (luci-app-homeproxy, powered
+#               by sing-box), pinned to its dev branch
 FEEDS=(
-  "kenzo https://github.com/kenzok8/openwrt-packages"
-  "small https://github.com/kenzok8/small"
+  "argon https://github.com/jerrykuku/luci-theme-argon.git"
+  "homeproxy https://github.com/immortalwrt/homeproxy.git;dev"
 )
 
 # The builder repo, from this script's own path: the shared config below is
@@ -90,7 +92,7 @@ exit 0
 EOF
 chmod 0755 files/etc/uci-defaults/98-conntrack-max
 
-# 2. kenzok8 package feeds.
+# 2. Argon theme and HomeProxy feeds.
 [[ -f feeds.conf ]] || cp feeds.conf.default feeds.conf
 
 for entry in "${FEEDS[@]}"; do
@@ -113,12 +115,12 @@ for entry in "${FEEDS[@]}"; do
   ./scripts/feeds install -a -p "$name"
 done
 
-# 3. Chinese LuCI translations and the Argon theme.
+# 3. Chinese LuCI translations, the Argon theme and HomeProxy.
 # Package selections in the shared config, so every board gets them; they are
 # added here so the package list sits with the rest of the build's
 # customizations. The symbols must exist when prepare-build.sh runs
 # `make defconfig` and checks them, which is why this comes after the feeds
-# above: the theme ships in kenzo's openwrt-packages.
+# above: the theme ships in jerrykuku's own feed, HomeProxy in its own.
 #
 # Current LuCI has no standalone language packages: every package with a po/
 # tree generates hidden luci-i18n-<app>-<locale> subpackages whose default is
@@ -137,8 +139,9 @@ BUILDER_CONFIG="$BUILDER_DIR/devices/common/config"
 CONFIG_LINES=(
   "CONFIG_LUCI_LANG_zh_Hans=y"
   "CONFIG_PACKAGE_luci-theme-argon=y"
+  "CONFIG_PACKAGE_luci-app-homeproxy=y"
 )
-marker='# Chinese LuCI translations and the Argon theme (customize-openwrt.sh)'
+marker='# Chinese LuCI translations, Argon and HomeProxy (customize-openwrt.sh)'
 for line in "${CONFIG_LINES[@]}"; do
   if grep -qxF "$line" "$BUILDER_CONFIG"; then
     log::info "$line already in devices/common/config"
