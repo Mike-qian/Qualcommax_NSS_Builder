@@ -189,6 +189,15 @@ jobs:
         with:
           path: builder
 
+      # Runs before prepare-build.sh so the kenzok8 feeds are updated and
+      # installed with the default ones: their packages then resolve into
+      # .config and can be selected like any other. The conntrack files ride
+      # the image from here on.
+      - name: Customize OpenWrt source
+        env:
+          OPENWRT_DIR: ${{ github.workspace }}/openwrt
+        run: bash builder/scripts/customize-openwrt.sh
+
       - name: Prepare build environment
         env:
           OPENWRT_DIR: ${{ github.workspace }}/openwrt

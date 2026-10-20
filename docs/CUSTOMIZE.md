@@ -29,6 +29,32 @@ existing feed replaces it, which is how the luci fork with
 `luci-app-qca-ppe-qos` stands in for the default luci feed. A new feed is not
 bundled whole: only the packages selected in the config are built.
 
+## Extra feeds, the connection limit and LuCI
+
+`scripts/customize-openwrt.sh`, run by the build job before
+`prepare-build.sh`, applies what the config and the overlays cannot:
+
+- the netfilter connection-tracking limit is raised to 65535.
+  `etc/sysctl.d/10-conntrack-max.conf` applies it at every boot, and a
+  `uci-defaults` script applies it on first boot and records it once, so a
+  later change of the limit survives a sysupgrade.
+- the kenzok8 feeds (`kenzo` = `kenzok8/openwrt-packages`, `small` =
+  `kenzok8/small`) are added to `feeds.conf` and installed, so their packages
+  resolve into `.config` and can be selected like any other. Nothing from
+  them is built until a config line picks it.
+- Chinese for every LuCI app, plus the Argon theme. Current LuCI has no
+  standalone language packages: every package with a `po/` tree generates
+  hidden `luci-i18n-<app>-<locale>` subpackages whose default is
+  `LUCI_LANG_<locale>||(ALL&&m)` (the `LuciTranslation` macro in `luci.mk`),
+  so `CONFIG_LUCI_LANG_zh_Hans=y` turns on Simplified Chinese across the
+  base UI, the admin modules and the apps at once. The theme
+  (`luci-theme-argon`) ships in the `kenzo` feed, which is why this runs
+  after the feeds are installed. The default language is not a package:
+  `devices/common/files/etc/config/luci` pins `option lang 'zh_cn'`, and a
+  user who picks another language in LuCI keeps it.
+
+Edit the script to change the limit, the feed list or the added config lines.
+
 ## Groups
 
 The `build` job builds every group:

@@ -1,0 +1,30 @@
+# Default LuCI settings for every image. Mirrors the file luci-base ships,
+# with the language pinned: the images carry the Chinese translations
+# (scripts/customize-openwrt.sh, CONFIG_LUCI_LANG_zh_Hans), so the interface
+# comes up in Simplified Chinese instead of following the browser's
+# Accept-Language header. This is a plain config file, not a uci-defaults
+# script: a user who picks another language in LuCI keeps it across reboots
+# and sysupgrades.
+config core 'main'
+	option lang 'zh_cn'
+	option mediaurlbase '/luci-static/bootstrap'
+	option resourcebase '/luci-static/resources'
+	option ubuspath '/ubus/'
+	option pollinterval '5'
+
+config internal 'languages'
+
+config internal 'sauth'
+	option sessionpath '/tmp/luci-sessions'
+	option sessiontime '3600'
+
+config internal 'ccache'
+	option enable '1'
+
+config internal 'themes'
+
+config internal 'apply'
+	option rollback '90'
+	option holdoff '4'
+	option timeout '5'
+	option display '1.5'
