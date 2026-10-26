@@ -8,10 +8,10 @@ CONFIG_TARGET_qualcommax_ipq807x=y
 CONFIG_TARGET_qualcommax_ipq807x_DEVICE_xiaomi_ax3600-stock=y
 
 ## The QCA9887 IoT radio is not used by this build.
-#CONFIG_ATH10K-CT_LEDS=n
-#CONFIG_PACKAGE_ath10k-board-qca9887=n
-#CONFIG_PACKAGE_ath10k-firmware-qca9887=n
-#CONFIG_PACKAGE_ath10k-firmware-qca9887-ct=n
+CONFIG_ATH10K-CT_LEDS=n
+CONFIG_PACKAGE_ath10k-board-qca9887=y
+CONFIG_PACKAGE_ath10k-firmware-qca9887=y
+CONFIG_PACKAGE_ath10k-firmware-qca9887-ct=n
 #CONFIG_PACKAGE_kmod-ath10k-ct-smallbuffers=n
 
 ## Hardware this board does not have.
