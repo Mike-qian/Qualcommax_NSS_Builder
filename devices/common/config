@@ -80,8 +80,10 @@ CONFIG_LIBCURL_MBEDTLS=n
 CONFIG_LIBCURL_OPENSSL=y
 CONFIG_PACKAGE_luci=y
 CONFIG_LUCI_LANG_zh_Hans=y
+CONFIG_PACKAGE_luci-theme-argon=y
 CONFIG_PACKAGE_luci-app-firewall=y
 CONFIG_PACKAGE_wpad-openssl=y
+CONFIG_PACKAGE_luci-app-ttyd=y
 
 ## USB storage. Stock images install it from the kmods feed, which cannot
 ## serve this kernel, so it is built in. kmod-fs-ext4 is a target default.
