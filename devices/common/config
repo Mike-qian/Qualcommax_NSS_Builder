@@ -151,3 +151,5 @@ CONFIG_PACKAGE_kmod-ramoops=y
 ## (ppe-help -h). It is a target default on ppe-nss; listed here so the
 ## images keep it whatever the profile selects.
 CONFIG_PACKAGE_ppe-help=y
+
+CONFIG_PACKAGE_autocore=y
