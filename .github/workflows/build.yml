@@ -188,7 +188,7 @@ jobs:
           path: builder
 
       - name: Download emortal packages
-        run: bash scripts/auto.sh "${{ github.workspace }}/openwrt"
+        run: bash builder/scripts/auto.sh "${{ github.workspace }}/openwrt"
         
       - name: Prepare build environment
         env:
