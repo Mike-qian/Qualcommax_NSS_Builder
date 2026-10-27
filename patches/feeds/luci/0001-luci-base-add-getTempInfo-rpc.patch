@@ -1,0 +1,29 @@
+diff --git a/modules/luci-base/root/usr/share/rpcd/ucode/luci b/modules/luci-base/root/usr/share/rpcd/ucode/luci
+index 73ed50d..209709a 100644
+--- a/modules/luci-base/root/usr/share/rpcd/ucode/luci
++++ b/modules/luci-base/root/usr/share/rpcd/ucode/luci
+@@ -135,6 +135,24 @@ const methods = {
+ 		}
+ 	},
+ 
++	getTempInfo: {
++		call: function() {
++			if (!access('/sbin/tempinfo'))
++				return {};
++
++			const fd = popen('/sbin/tempinfo');
++			if (fd) {
++				let tempinfo = fd.read('all');
++				if (!tempinfo)
++					tempinfo = '?';
++				fd.close();
++
++				return { tempinfo: tempinfo };
++			} else {
++				return { tempinfo: error() };
++			}
++		}
++	},
+ 	getUnixtime: {
+ 		call: function(request) {
+ 			// time() ; Returns the current UNIX epoch.
