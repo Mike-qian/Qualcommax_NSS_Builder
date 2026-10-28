@@ -31,7 +31,7 @@ CONFIG_ZLIB_OPTIMIZE_SPEED=y
 
 ## Every kernel module, published as the image's apk feed: the kernel's
 ## vermagic depends on the selected modules, so only this build can serve them.
-CONFIG_ALL_KMODS=y
+CONFIG_ALL_KMODS=n
 ## An ImageBuilder holding every package of this build, which the image
 ## picker's custom builds (custom.yml) run from.
 CONFIG_IB=y
@@ -87,9 +87,9 @@ CONFIG_PACKAGE_luci-app-ttyd=y
 
 ## USB storage. Stock images install it from the kmods feed, which cannot
 ## serve this kernel, so it is built in. kmod-fs-ext4 is a target default.
-CONFIG_PACKAGE_kmod-usb-storage=y
-CONFIG_PACKAGE_kmod-usb-storage-uas=y
-CONFIG_PACKAGE_block-mount=y
+CONFIG_PACKAGE_kmod-usb-storage=n
+CONFIG_PACKAGE_kmod-usb-storage-uas=n
+CONFIG_PACKAGE_block-mount=n
 
 ## TUN for Tailscale, OpenVPN and the like, for the same reason.
 CONFIG_PACKAGE_kmod-tun=y
@@ -157,3 +157,4 @@ CONFIG_PACKAGE_autocore=y
 CONFIG_PACKAGE_default-settings=y
 CONFIG_PACKAGE_luci-app-passwall2=y
 CONFIG_PACKAGE_luci-app-nikki=y
+CONFIG_PACKAGE_sing-box=y
