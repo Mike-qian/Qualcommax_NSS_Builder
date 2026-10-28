@@ -16,14 +16,22 @@ cp -a package/emortal/. "$OPENWRT_DIR/package/emortal/"
 echo "完成, emortal 包:"
 ls -1 "$OPENWRT_DIR/package/emortal/"
 
-# --- passwall + nikki feeds 追加到 feeds.conf.default 末尾 ---
-echo "src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main" >> "$OPENWRT_DIR/feeds.conf.default"
-echo "src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main" >> "$OPENWRT_DIR/feeds.conf.default"
-echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "$OPENWRT_DIR/feeds.conf.default"
-echo "src-git argon https://github.com/jerrykuku/luci-theme-argon.git" >> "$OPENWRT_DIR/feeds.conf.default"
+# --- kiddin9/op-packages 作为 feed 追加到 feeds.conf.default 末尾 ---
+echo "src-git kiddin9 https://github.com/kiddin9/op-packages.git" >> "$OPENWRT_DIR/feeds.conf.default"
 echo
 echo "feeds.conf.default:"
 cat "$OPENWRT_DIR/feeds.conf.default"
+
+# --- 首次开机删掉 distfeeds.list 里的 kiddin9 行 (uci-defaults) ---
+# 自定义 feed 会被构建系统写进设备上的 /etc/apk/repositories.d/distfeeds.list,
+# 设备上无法用它装包, 首启移除避免 apk update 报错。
+mkdir -p "$OPENWRT_DIR/files/etc/uci-defaults"
+cat > "$OPENWRT_DIR/files/etc/uci-defaults/998-drop-kiddin9-feed" << 'EOF'
+sed -i '\|kiddin9/op-packages|d' /etc/apk/repositories.d/distfeeds.list
+EOF
+echo
+echo "已写入 files/etc/uci-defaults/998-drop-kiddin9-feed:"
+cat "$OPENWRT_DIR/files/etc/uci-defaults/998-drop-kiddin9-feed"
 
 # --- 活动连接上限 65535 (uci-defaults) ---
 mkdir -p "$OPENWRT_DIR/files/etc/uci-defaults"
