@@ -318,9 +318,11 @@ jobs:
           [[ ${#assets[@]} -gt 0 ]] || { echo "::error::no sysupgrade images in $out"; exit 1; }
           grep 'sysupgrade.bin' "$out/sha256sums" >"sha256sums-${DEVICE}.txt"
           cp "$out/config.buildinfo" "config-${DEVICE}.buildinfo"
-          # A friendlier copy of the resolved build config, published as
-          # Config-<device>.txt so a downloader can see exactly what was built.
-          cp "$out/config.buildinfo" "Config-${DEVICE}.txt"
+          # The full resolved .config: every Kconfig symbol, with unselected
+          # packages written as '# CONFIG_... is not set'. This is the complete
+          # build config a downloader expects, unlike config.buildinfo which is
+          # the trimmed diffconfig (selected + non-default symbols only).
+          cp "openwrt/.config" "Config-${DEVICE}.txt"
           # The ImageBuilder and the overlay files are what custom.yml builds
           # a picked package set from.
           ib=$(find "$out" -maxdepth 1 -name 'openwrt-imagebuilder-*.tar.zst')
