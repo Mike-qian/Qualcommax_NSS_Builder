@@ -30,7 +30,7 @@ cat > "$OPENWRT_DIR/files/etc/uci-defaults/998-clean-distfeeds" << 'EOF'
 EOF
 echo
 echo "已写入 files/etc/uci-defaults/998-clean-distfeeds:"
-cat "$OPENWRT_DIR/files/etc/uci-defaults/998-drop-kiddin9-feed"
+cat "$OPENWRT_DIR/files/etc/uci-defaults/998-clean-distfeeds"
 
 # --- 活动连接上限 65535 (uci-defaults) ---
 mkdir -p "$OPENWRT_DIR/files/etc/uci-defaults"
