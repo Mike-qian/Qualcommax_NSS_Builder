@@ -23,14 +23,13 @@ echo "feeds.conf.default:"
 cat "$OPENWRT_DIR/feeds.conf.default"
 
 # --- 首次开机删掉 distfeeds.list 里的 kiddin9 行 (uci-defaults) ---
-# 自定义 feed 会被构建系统写进设备上的 /etc/apk/repositories.d/distfeeds.list,
-# 设备上无法用它装包, 首启移除避免 apk update 报错。
 mkdir -p "$OPENWRT_DIR/files/etc/uci-defaults"
-cat > "$OPENWRT_DIR/files/etc/uci-defaults/998-drop-kiddin9-feed" << 'EOF'
-sed -i '\|kiddin9/op-packages|d' /etc/apk/repositories.d/distfeeds.list
+cat > "$OPENWRT_DIR/files/etc/uci-defaults/998-clean-distfeeds" << 'EOF'
+[ -f /etc/apk/repositories.d/distfeeds.list ] && \
+    sed -i -e '/kiddin9/d' -e '/mike-qian\.github\.io/d' /etc/apk/repositories.d/distfeeds.list
 EOF
 echo
-echo "已写入 files/etc/uci-defaults/998-drop-kiddin9-feed:"
+echo "已写入 files/etc/uci-defaults/998-clean-distfeeds:"
 cat "$OPENWRT_DIR/files/etc/uci-defaults/998-drop-kiddin9-feed"
 
 # --- 活动连接上限 65535 (uci-defaults) ---
