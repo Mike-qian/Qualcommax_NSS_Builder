@@ -161,4 +161,11 @@ CONFIG_KERNEL_DEBUG_KERNEL=n
 CONFIG_KERNEL_DEBUG_INFO=n
 CONFIG_KERNEL_DEBUG_INFO_REDUCED=n
 
-
+CONFIG_PACKAGE_kmod-crypto-des=y
+CONFIG_PACKAGE_kmod-crypto-sha1=y
+CONFIG_PACKAGE_kmod-crypto-sha256=y
+CONFIG_PACKAGE_kmod-crypto-cbc=y
+CONFIG_PACKAGE_kmod-crypto-ecb=y
+CONFIG_PACKAGE_kmod-crypto-xts=y
+CONFIG_PACKAGE_kmod-crypto-authenc=y
+CONFIG_OPENSSL_KTLS=y
