@@ -1,0 +1,71 @@
+diff --git a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+index cc7f0cd..50d7e66 100644
+--- a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
++++ b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+@@ -9,6 +9,21 @@ var callTempInfo = rpc.declare({
+ 	method: 'getTempInfo'
+ });
+ 
++var callCPUBench = rpc.declare({
++	object: 'luci',
++	method: 'getCPUBench'
++});
++
++var callCPUInfo = rpc.declare({
++	object: 'luci',
++	method: 'getCPUInfo'
++});
++
++var callCPUUsage = rpc.declare({
++	object: 'luci',
++	method: 'getCPUUsage'
++});
++
+ var callGetUnixtime = rpc.declare({
+ 	object: 'luci',
+ 	method: 'getUnixtime',
+@@ -40,6 +55,9 @@ return baseclass.extend({
+ 			L.resolveDefault(callLuciVersion(), { revision: _('unknown version'), branch: 'LuCI' }),
+ 			L.resolveDefault(callGetUnixtime(), 0),
+ 			L.resolveDefault(callTempInfo(), {}),
++			L.resolveDefault(callCPUBench(), {}),
++			L.resolveDefault(callCPUInfo(), {}),
++			L.resolveDefault(callCPUUsage(), {}),
+ 			uci.load('system')
+ 		]);
+ 	},
+@@ -49,7 +67,10 @@ return baseclass.extend({
+ 		    systeminfo  = data[1],
+ 		    luciversion = data[2],
+ 		    unixtime    = data[3],
+-		    tempinfo    = data[4];
++		    tempinfo    = data[4],
++		    cpubench    = data[5],
++		    cpuinfo     = data[6],
++		    cpuusage    = data[7];
+ 
+ 		luciversion = luciversion.branch + ' ' + luciversion.revision;
+ 
+@@ -71,8 +92,8 @@ return baseclass.extend({
+ 
+ 		var fields = [
+ 			_('Hostname'),         boardinfo.hostname,
+-			_('Model'),            boardinfo.model,
+-			_('Architecture'),     boardinfo.system,
++			_('Model'),            boardinfo.model + cpubench.cpubench,
++			_('Architecture'),     cpuinfo.cpuinfo || boardinfo.system,
+ 			_('Target Platform'),  (L.isObject(boardinfo.release) ? boardinfo.release.target : ''),
+ 			_('Firmware Version'), (L.isObject(boardinfo.release) ? boardinfo.release.description + ' / ' : '') + (luciversion || ''),
+ 			_('Kernel Version'),   boardinfo.kernel,
+@@ -82,8 +103,9 @@ return baseclass.extend({
+ 				systeminfo.load[0] / 65535.0,
+ 				systeminfo.load[1] / 65535.0,
+ 				systeminfo.load[2] / 65535.0
+-			) : null
+-		];
++		) : null,
++		_('CPU usage (%)'),  cpuusage.cpuusage
++	];
+ 
+ 		if (tempinfo.tempinfo) {
+ 			fields.splice(6, 0, _('Temperature'));
