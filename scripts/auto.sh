@@ -85,7 +85,8 @@ cat "$UCI_DIR/999-conntrack-max"
 
 # --- 添加 ppenss 的 APK 签名公钥 (从 ppenss feed 的 base-files.apk 中提取) ---
 # 真实文件带版本号 (base-files-<ver>.apk), 先用 GitHub API 解析文件名, 再下载并解包取包内
-# etc/apk/keys/ 下的公钥 (即该 feed 的信任锚)。提取失败则不写入任何公钥, 且绝不中断构建。
+# 的 etc/apk/keys/public-key.pem (即该 feed 的信任锚), 写入 files/etc/apk/keys/ppenss.pem。
+# 提取失败则不写入任何公钥, 且绝不中断构建。
 APK_KEYS_DIR="$OPENWRT_DIR/files/etc/apk/keys"
 mkdir -p "$APK_KEYS_DIR"
 
@@ -99,18 +100,24 @@ if command -v curl >/dev/null 2>&1 && [[ -n "$PPENSS_TAG" ]]; then
     BF_TMP="$(mktemp)"
     curl -fsSL --retry 3 "$BF_URL" -o "$BF_TMP" 2>/dev/null
     if [[ -s "$BF_TMP" ]]; then
-      # apk 包内成员可能带 ./ 前缀, 统一去掉再匹配 (兼容 GNU tar 与 apk-tools 两种格式)
-      KEY_FILE="$(tar -tzf "$BF_TMP" 2>/dev/null | sed -E 's#^\./##' | grep -E '^etc/apk/keys/[^/]+\.(pem|rsa|pub)$' | head -1)"
-      if [[ -n "$KEY_FILE" ]]; then
-        tar -xzf "$BF_TMP" -O "$KEY_FILE" > "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null
+      # 公钥固定路径为 etc/apk/keys/public-key.pem; 包内成员可能带 ./ 前缀 (GNU tar)
+      # 或不带 (apk-tools), 故先探测实际成员名, 再用原始名解包。
+      KEY_INNER=""
+      if tar -tzf "$BF_TMP" 2>/dev/null | grep -qxF "etc/apk/keys/public-key.pem"; then
+        KEY_INNER="etc/apk/keys/public-key.pem"
+      elif tar -tzf "$BF_TMP" 2>/dev/null | grep -qxF "./etc/apk/keys/public-key.pem"; then
+        KEY_INNER="./etc/apk/keys/public-key.pem"
+      fi
+      if [[ -n "$KEY_INNER" ]]; then
+        tar -xzf "$BF_TMP" -O "$KEY_INNER" > "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null
         if grep -q "PUBLIC KEY" "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null; then
           KEY_OK=1
         else
-          echo "警告: 提取到的 $KEY_FILE 内容不含 PUBLIC KEY, 已丢弃。" >&2
+          echo "警告: 提取到的 public-key.pem 内容不含 PUBLIC KEY, 已丢弃。" >&2
           rm -f "$APK_KEYS_DIR/ppenss.pem"
         fi
       else
-        echo "警告: base-files.apk 内未找到 etc/apk/keys/ 下的公钥, 跳过。" >&2
+        echo "警告: base-files.apk 内未找到 etc/apk/keys/public-key.pem, 跳过。" >&2
       fi
     else
       echo "警告: 下载 ppenss base-files.apk 失败 (空文件或网络错误), 跳过公钥写入。" >&2
