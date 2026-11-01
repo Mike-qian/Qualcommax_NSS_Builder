@@ -85,35 +85,51 @@ cat "$UCI_DIR/999-conntrack-max"
 
 # --- 添加 ppenss 的 APK 签名公钥 (从 ppenss feed 的 base-files.apk 中提取) ---
 # 真实文件带版本号 (base-files-<ver>.apk), 先用 GitHub API 解析文件名, 再下载并解包取包内
-# etc/apk/keys/ 下的公钥 (即该 feed 的信任锚)。提取失败则不写入任何公钥。
+# etc/apk/keys/ 下的公钥 (即该 feed 的信任锚)。提取失败则不写入任何公钥, 且绝不中断构建。
 APK_KEYS_DIR="$OPENWRT_DIR/files/etc/apk/keys"
 mkdir -p "$APK_KEYS_DIR"
+
+set +e
 KEY_OK=0
 if command -v curl >/dev/null 2>&1 && [[ -n "$PPENSS_TAG" ]]; then
   BF_NAME="$(curl -fsSL --retry 3 "https://api.github.com/repos/ppenss/ppenss.github.io/contents/$PPENSS_TAG/xiaomi_ax3600" 2>/dev/null \
-    | grep -oE '"name":[[:space:]]*"base-files-[^"]+\.apk"' | sed -E 's/.*"([^"]+)"/\1/' | head -1)" || true
+    | grep -oE '"name":[[:space:]]*"base-files-[^"]+\.apk"' | sed -E 's/.*"([^"]+)"/\1/' | head -1)"
   if [[ -n "$BF_NAME" ]]; then
     BF_URL="https://raw.githubusercontent.com/ppenss/ppenss.github.io/main/$PPENSS_TAG/xiaomi_ax3600/$BF_NAME"
     BF_TMP="$(mktemp)"
-    if curl -fsSL --retry 3 "$BF_URL" -o "$BF_TMP" 2>/dev/null && [[ -s "$BF_TMP" ]]; then
-      KEY_FILE="$(tar -tzf "$BF_TMP" 2>/dev/null | grep -E 'etc/apk/keys/[^/]+\.(pem|rsa|pub)$' | head -1)"
+    curl -fsSL --retry 3 "$BF_URL" -o "$BF_TMP" 2>/dev/null
+    if [[ -s "$BF_TMP" ]]; then
+      # apk 包内成员可能带 ./ 前缀, 统一去掉再匹配 (兼容 GNU tar 与 apk-tools 两种格式)
+      KEY_FILE="$(tar -tzf "$BF_TMP" 2>/dev/null | sed -E 's#^\./##' | grep -E '^etc/apk/keys/[^/]+\.(pem|rsa|pub)$' | head -1)"
       if [[ -n "$KEY_FILE" ]]; then
-        if tar -xzf "$BF_TMP" -O "$KEY_FILE" > "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null \
-           && grep -q "PUBLIC KEY" "$APK_KEYS_DIR/ppenss.pem"; then
+        tar -xzf "$BF_TMP" -O "$KEY_FILE" > "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null
+        if grep -q "PUBLIC KEY" "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null; then
           KEY_OK=1
+        else
+          echo "警告: 提取到的 $KEY_FILE 内容不含 PUBLIC KEY, 已丢弃。" >&2
+          rm -f "$APK_KEYS_DIR/ppenss.pem"
         fi
+      else
+        echo "警告: base-files.apk 内未找到 etc/apk/keys/ 下的公钥, 跳过。" >&2
       fi
+    else
+      echo "警告: 下载 ppenss base-files.apk 失败 (空文件或网络错误), 跳过公钥写入。" >&2
     fi
     rm -f "$BF_TMP"
+  else
+    echo "警告: 未在 ppenss 仓库 $PPENSS_TAG/xiaomi_ax3600 找到 base-files-*.apk, 跳过公钥写入。" >&2
   fi
+else
+  echo "警告: 缺少 curl 或 PPENSS_TAG 为空, 跳过公钥写入。" >&2
 fi
+set -e
 
 if [[ "$KEY_OK" -eq 1 ]]; then
   echo "已从 ppenss base-files.apk ($BF_NAME) 提取公钥 -> $APK_KEYS_DIR/ppenss.pem"
   echo "公钥内容:"
   cat "$APK_KEYS_DIR/ppenss.pem"
 else
-  echo "警告: 未能从 ppenss base-files.apk 提取公钥, 未写入任何公钥 (构建需联网才能获取)。" >&2
+  echo "注意: 本次未写入 ppenss 公钥 (仅影响运行时从 ppenss feed 安装包, 不影响刷机与构建)。" >&2
 fi
 echo
 echo "提示: 确认 devices/common/config 中含 CONFIG_PACKAGE_autocore=y"
