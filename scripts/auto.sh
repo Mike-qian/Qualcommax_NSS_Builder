@@ -84,15 +84,17 @@ echo "已写入 files/etc/uci-defaults/999-conntrack-max:"
 cat "$UCI_DIR/999-conntrack-max"
 
 # --- 添加 ppenss 的 APK 签名公钥 (从 ppenss feed 的 base-files.apk 中提取) ---
-# 真实文件带版本号 (base-files-<ver>.apk), 先用 GitHub API 解析文件名, 再下载并解包取包内
-# 的 etc/apk/keys/public-key.pem (即该 feed 的信任锚), 写入 files/etc/apk/keys/ppenss.pem。
-# 提取失败则不写入任何公钥, 且绝不中断构建。
+# ppenss 的 .apk 是 ADB v3 二进制容器 (魔数 "ADB" + 版本字节), 外层为 raw-deflate:
+#   跳过 4 字节头 -> raw-deflate 解压 -> 得到 ADB 包体, 公钥内容 (etc/apk/keys/public-key.pem)
+#   以明文嵌在解压体里。故用 python3 解码并正则抠出 BEGIN/END PUBLIC KEY, 写入
+#   files/etc/apk/keys/ppenss.pem (该 feed 的信任锚)。
+# 提取失败则不写入任何公钥, 且绝不中断构建 (整段包在 set +e 中)。
 APK_KEYS_DIR="$OPENWRT_DIR/files/etc/apk/keys"
 mkdir -p "$APK_KEYS_DIR"
 
 set +e
 KEY_OK=0
-if command -v curl >/dev/null 2>&1 && [[ -n "$PPENSS_TAG" ]]; then
+if command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 && [[ -n "$PPENSS_TAG" ]]; then
   BF_NAME="$(curl -fsSL --retry 3 "https://api.github.com/repos/ppenss/ppenss.github.io/contents/$PPENSS_TAG/xiaomi_ax3600" 2>/dev/null \
     | grep -oE '"name":[[:space:]]*"base-files-[^"]+\.apk"' | sed -E 's/.*"([^"]+)"/\1/' | head -1)"
   if [[ -n "$BF_NAME" ]]; then
@@ -100,24 +102,47 @@ if command -v curl >/dev/null 2>&1 && [[ -n "$PPENSS_TAG" ]]; then
     BF_TMP="$(mktemp)"
     curl -fsSL --retry 3 "$BF_URL" -o "$BF_TMP" 2>/dev/null
     if [[ -s "$BF_TMP" ]]; then
-      # 公钥固定路径为 etc/apk/keys/public-key.pem; 包内成员可能带 ./ 前缀 (GNU tar)
-      # 或不带 (apk-tools), 故先探测实际成员名, 再用原始名解包。
-      KEY_INNER=""
-      if tar -tzf "$BF_TMP" 2>/dev/null | grep -qxF "etc/apk/keys/public-key.pem"; then
-        KEY_INNER="etc/apk/keys/public-key.pem"
-      elif tar -tzf "$BF_TMP" 2>/dev/null | grep -qxF "./etc/apk/keys/public-key.pem"; then
-        KEY_INNER="./etc/apk/keys/public-key.pem"
-      fi
-      if [[ -n "$KEY_INNER" ]]; then
-        tar -xzf "$BF_TMP" -O "$KEY_INNER" > "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null
-        if grep -q "PUBLIC KEY" "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null; then
-          KEY_OK=1
-        else
-          echo "警告: 提取到的 public-key.pem 内容不含 PUBLIC KEY, 已丢弃。" >&2
-          rm -f "$APK_KEYS_DIR/ppenss.pem"
-        fi
+      # 用 python3 解析 ADB 容器并抠出公钥; 任何异常都当做提取失败。
+      python3 - "$BF_TMP" "$APK_KEYS_DIR/ppenss.pem" <<'PY'
+import sys, zlib, re
+apk_path, out_path = sys.argv[1], sys.argv[2]
+try:
+    data = open(apk_path, 'rb').read()
+    blob = None
+    # ADB 头为 "ADB" + 1 字节版本, 之后是 raw-deflate 流; 在 0..16 偏移内试探找到可解压且含公钥的流
+    for off in range(0, 17):
+        try:
+            b = zlib.decompress(data[off:], -15)
+        except Exception:
+            continue
+        if b'BEGIN PUBLIC KEY' in b or b'public-key.pem' in b:
+            blob = b
+            break
+    if blob is None:
+        # 兜底: 直接整文件 raw-deflate
+        try:
+            blob = zlib.decompress(data, -15)
+        except Exception:
+            blob = b''
+    m = re.search(rb'-----BEGIN PUBLIC KEY-----.*?-----END PUBLIC KEY-----', blob, re.S)
+    if not m:
+        sys.stderr.write("警告: ADB 解压体中未找到 PUBLIC KEY, 跳过。\n")
+        sys.exit(1)
+    pem = m.group(0)
+    # 规范化行尾并写出
+    text = pem.decode('utf-8', 'replace').replace('\r\n', '\n').strip() + "\n"
+    with open(out_path, 'w') as f:
+        f.write(text)
+    sys.exit(0)
+except Exception as e:
+    sys.stderr.write("警告: 解析 base-files.apk 失败: %s, 跳过公钥写入。\n" % e)
+    sys.exit(1)
+PY
+      if [[ -s "$APK_KEYS_DIR/ppenss.pem" ]] && grep -q "PUBLIC KEY" "$APK_KEYS_DIR/ppenss.pem" 2>/dev/null; then
+        KEY_OK=1
       else
-        echo "警告: base-files.apk 内未找到 etc/apk/keys/public-key.pem, 跳过。" >&2
+        echo "警告: 提取 ppenss 公钥失败, 未写入文件。" >&2
+        rm -f "$APK_KEYS_DIR/ppenss.pem"
       fi
     else
       echo "警告: 下载 ppenss base-files.apk 失败 (空文件或网络错误), 跳过公钥写入。" >&2
@@ -127,7 +152,7 @@ if command -v curl >/dev/null 2>&1 && [[ -n "$PPENSS_TAG" ]]; then
     echo "警告: 未在 ppenss 仓库 $PPENSS_TAG/xiaomi_ax3600 找到 base-files-*.apk, 跳过公钥写入。" >&2
   fi
 else
-  echo "警告: 缺少 curl 或 PPENSS_TAG 为空, 跳过公钥写入。" >&2
+  echo "警告: 缺少 curl/python3 或 PPENSS_TAG 为空, 跳过公钥写入。" >&2
 fi
 set -e
 
