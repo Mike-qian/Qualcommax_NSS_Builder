@@ -76,7 +76,6 @@ if command -v uci >/dev/null 2>&1; then
     uci -q set system.@system[0].timezone='CST-8'
     uci -q set system.@system[0].log_level='6'
     uci -q set system.@system[0].conloglevel='6'
-    uci -q set system.@system[0].cronloglevel='5'
     uci -q set system.@system[0].log_size='64'
     uci -q commit system
 fi
