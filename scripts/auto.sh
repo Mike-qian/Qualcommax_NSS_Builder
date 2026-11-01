@@ -67,15 +67,17 @@ echo
 echo "已写入 files/etc/uci-defaults/999-conntrack-max:"
 cat "$UCI_DIR/999-conntrack-max"
 
-# --- 首次开机: 时区与系统日志设置 ---
+# --- 首次开机: 时区、系统日志与 NTP 设置 ---
 cat > "$UCI_DIR/996-tz-locale" << 'EOF'
 #!/bin/sh
-# 时区设为 Asia/Shanghai (北京时间, CST-8); 日志等级 6, 系统日志缓冲区 64 KiB。
+# 时区设为 Asia/Shanghai (北京时间, CST-8); 日志等级 6, 系统日志缓冲区 64 KiB;
+# NTP 时间服务器换成国内节点。
 if command -v uci >/dev/null 2>&1; then
     uci -q set system.@system[0].zonename='Asia/Shanghai'
     uci -q set system.@system[0].timezone='CST-8'
     uci -q set system.@system[0].log_level='6'
     uci -q set system.@system[0].log_size='64'
+    uci -q set system.@system[0].ntp_server='ntp.tencent.com' 'ntp.aliyun.com' 'ntp.ntsc.ac.cn' 'cn.ntp.org.cn'
     uci -q commit system
 fi
 EOF
