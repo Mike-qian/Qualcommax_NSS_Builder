@@ -28,6 +28,27 @@ echo
 echo "feeds.conf.default:"
 cat "$OPENWRT_DIR/feeds.conf.default"
 
+# --- 内核配置: qualcommax target 开启 crypto 用户态 API 与 QCE 硬件加速 ---
+# 删除旧的 CONFIG_CRYPTO_DEV_QCE / CONFIG_CRYPTO_USER_API* (含 =y 与 " is not set" 两种写法),
+# 再统一追加 =y, 确保 IPQ807x 的 QCE 硬件加解密与用户态 crypto API 被编入内核。
+F="$OPENWRT_DIR/target/linux/qualcommax/config-6.18"
+if [ -f "$F" ]; then
+    sed -i -E '/^#? *CONFIG_CRYPTO_DEV_QCE(=| is not set)/d' "$F"
+    sed -i -E '/^#? *CONFIG_CRYPTO_USER_API(_SKCIPHER|_HASH|_AEAD)?(=| is not set)/d' "$F"
+    # 追加 5 行
+    cat >> "$F" <<'EOF'
+CONFIG_CRYPTO_DEV_QCE=y
+CONFIG_CRYPTO_USER_API=y
+CONFIG_CRYPTO_USER_API_SKCIPHER=y
+CONFIG_CRYPTO_USER_API_HASH=y
+CONFIG_CRYPTO_USER_API_AEAD=y
+EOF
+    echo
+    echo "已更新内核配置 $F (crypto 用户态 API + QCE 硬件加速 =y)"
+else
+    echo "警告: 未找到内核配置文件 $F, 跳过 crypto 配置修改。" >&2
+fi
+
 # --- 首次开机: 把 mike-qian kmod feed 替换为官方 OpenWrt snapshots 软件包源 ---
 UCI_DIR="$OPENWRT_DIR/files/etc/uci-defaults"
 mkdir -p "$UCI_DIR"
