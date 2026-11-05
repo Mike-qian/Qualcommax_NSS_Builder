@@ -29,8 +29,6 @@ CONFIG_USE_GC_SECTIONS=y
 CONFIG_USE_LTO=y
 CONFIG_USE_MOLD=y
 CONFIG_ZLIB_OPTIMIZE_SPEED=y
-CONFIG_BPF_JIT=y
-CONFIG_BPF_JIT_ALWAYS_ON=y
 
 ## Every kernel module, published as the image's apk feed: the kernel's
 ## vermagic depends on the selected modules, so only this build can serve them.
