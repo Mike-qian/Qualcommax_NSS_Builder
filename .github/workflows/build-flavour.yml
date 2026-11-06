@@ -355,7 +355,7 @@ jobs:
           for attempt in 1 2 3; do
             gh release upload "$TAG" \
               --repo "$GITHUB_REPOSITORY" --clobber \
-              "${assets[@]}" "sha256sums-${DEVICE}.txt" "config-${DEVICE}.buildinfo" && break
+              "${assets[@]}" "sha256sums-${DEVICE}.txt" "config-${DEVICE}.buildinfo" "config-${DEVICE}.full" && break
             [[ $attempt -lt 3 ]] || { echo "::error::upload failed after $attempt attempts"; exit 1; }
             echo "::warning::upload attempt $attempt failed; retrying"
             sleep 15
