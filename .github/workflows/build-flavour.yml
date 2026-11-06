@@ -340,7 +340,7 @@ jobs:
           mapfile -t assets < <(find "$out" -maxdepth 1 -type f -name 'openwrt-*-squashfs-sysupgrade.bin')
           [[ ${#assets[@]} -gt 0 ]] || { echo "::error::no sysupgrade images in $out"; exit 1; }
           grep 'sysupgrade.bin' "$out/sha256sums" >"sha256sums-${DEVICE}.txt"
-          cp -f ./.config "config-${DEVICE}.full"
+          cp -f openwrt/.config "config-${DEVICE}.full"
           cp "$out/config.buildinfo" "config-${DEVICE}.buildinfo"
           # The ImageBuilder and the overlay files are what custom.yml builds
           # a picked package set from.
