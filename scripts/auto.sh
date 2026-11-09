@@ -125,5 +125,30 @@ echo
 echo "已写入 files/etc/uci-defaults/996-tz-locale:"
 cat "$UCI_DIR/996-tz-locale"
 
+# --- 首次开机: 修补 luci.upnp 的端口转发解析正则 ---
+# 把 match() 中的 `^\t\tiif` 改为 `^\s*iif`, 并把 `dport ([0-9]+) dnat ip to`
+# 改为 `dport ([0-9]+) .*dnat ip to`, 以兼容 @//nh 接口的端口映射输出格式。
+cat > "$UCI_DIR/997-fix-luci-upnp" << 'EOF'
+#!/bin/sh
+# 修补 /usr/share/rpcd/ucode/luci.upnp 中解析 upnp 端口转发行的正则,
+# 使其对 @//nh 接口的 nft 规则同样生效。
+F="/usr/share/rpcd/ucode/luci.upnp"
+if [ -f "$F" ]; then
+    # 1) `^\t\tiif` -> `^\s*iif` (ucode 正则: \t 单 tab -> \s 任意空白)
+    # 2) `dport ([0-9]+) dnat ip to` -> `dport ([0-9]+) .*dnat ip to`
+    #    用 `) dnat ip to` 这一唯一字面片段做替换, 规避 BRE 中 ()[]+ 的特殊含义。
+    sed -i -e 's/\\t\\tiif/\\s*iif/' -e 's/) dnat ip to/) .*dnat ip to/' "$F"
+    echo "已修补 $F 的 upnp 解析正则。"
+else
+    echo "警告: 未找到 $F, 跳过 luci.upnp 修补。" >&2
+fi
+# 重新加载 rpcd 使改动立即生效 (首次开机时若尚未启动则忽略)。
+[ -x /etc/init.d/rpcd ] && /etc/init.d/rpcd restart 2>/dev/null || true
+EOF
+chmod +x "$UCI_DIR/997-fix-luci-upnp"
+echo
+echo "已写入 files/etc/uci-defaults/997-fix-luci-upnp:"
+cat "$UCI_DIR/997-fix-luci-upnp"
+
 echo
 echo "提示: 确认 devices/common/config 中含 CONFIG_PACKAGE_autocore=y"
