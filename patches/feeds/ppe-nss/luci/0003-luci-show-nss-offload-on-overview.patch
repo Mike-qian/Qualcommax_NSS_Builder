@@ -1,20 +1,21 @@
 diff --git a/modules/luci-base/root/usr/share/rpcd/ucode/luci b/modules/luci-base/root/usr/share/rpcd/ucode/luci
-index bc1507d..29b84ac 100644
+index bc1507d..81e3c47 100644
 --- a/modules/luci-base/root/usr/share/rpcd/ucode/luci
 +++ b/modules/luci-base/root/usr/share/rpcd/ucode/luci
-@@ -167,6 +167,42 @@
+@@ -167,6 +167,43 @@
  			return result;
  		}
  	},
 +	getNssOffload: {
 +		call: function() {
-+			// Connections offloaded to the PPE and NSS firmware: [HW_OFFLOAD]
-+			// conntrack entries plus the bridged, installed flows that
-+			// nss-wifi-drv lists under /sys/kernel/debug/*.nss/flows.
++			// Connection counts in one sample; see OFFLOAD_CMD for the
++			// order of the six values. [OFFLOAD] is software-only and does
++			// not overlap with [HW_OFFLOAD]; the NSS firmware rules are a
++			// 1:1 mirror of the hardware entries and must not be added.
 +			if (!access('/proc/net/nf_conntrack'))
 +				return {};
 +
-+			const fd = popen("cat /proc/net/nf_conntrack /sys/kernel/debug/*.nss/flows 2>/dev/null | awk 'index($0,\"[HW_OFFLOAD]\") { if ($1==\"ipv4\") v4++; else if ($1==\"ipv6\") v6++ } /^proto / && index($0,\" bridged \") && index($0,\" installed 1 \") { if ($3==\"v4\") v4++; else if ($3==\"v6\") v6++ } END { printf \"%d %d\\n\", v4, v6 }'");
++			const fd = popen("{ echo @@CONN@@; cat /proc/net/nf_conntrack 2>/dev/null; for f in /sys/kernel/debug/*.nss/flows; do [ -r \"$f\" ] || continue; echo @@FLOWS@@; cat \"$f\" 2>/dev/null; done; } | awk 'BEGIN{part=0;t=0;h=0;s=0;v4=0;v6=0;e=0} /^@@CONN@@$/{part=1;next} /^@@FLOWS@@$/{part=2;next} part==1{t++;if(index($0,\"[HW_OFFLOAD]\")){h++;if($1==\"ipv4\")v4++;else if($1==\"ipv6\")v6++} if(index($0,\"[OFFLOAD]\"))s++;next} part==2&&/^bridged on /{for(i=1;i<=NF;i++)if($i==\"entries\")e+=$(i+1)} END{printf \"%d %d %d %d %d %d\\n\",t,h,s,v4,v6,e}'");
 +			if (!fd)
 +				return {};
 +
@@ -46,7 +47,7 @@ index bc1507d..29b84ac 100644
  		call: function(request) {
  			// time() ; Returns the current UNIX epoch.
 diff --git a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
-index 5f079d6..edc7177 100644
+index 5f079d6..b5f5d7d 100644
 --- a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
 +++ b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
 @@ -30,6 +30,16 @@
@@ -86,7 +87,7 @@ index 5f079d6..edc7177 100644
  
  		luciversion = luciversion.branch + ' ' + luciversion.revision;
  
-@@ -95,6 +109,31 @@
+@@ -95,6 +109,46 @@
  		if (temptext)
  			fields.splice(6, 0, _('Temperature'), temptext);
  
@@ -109,10 +110,25 @@ index 5f079d6..edc7177 100644
 +
 +		if (nssinfo && nssinfo.offload) {
 +			var counts = nssinfo.offload.trim().split(/\s+/),
-+			    v4 = +counts[0] || 0,
-+			    v6 = +counts[1] || 0;
++			    total   = +counts[0],
++			    hw      = +counts[1] || 0,
++			    sw      = +counts[2] || 0,
++			    v4      = +counts[3] || 0,
++			    v6      = +counts[4] || 0,
++			    nssb    = +counts[5] || 0;
 +
-+			fields.push(_('Hardware offload'), _('%d flows (%d IPv4, %d IPv6)').format(v4 + v6, v4, v6));
++			if (counts.length == 6 && total >= 0) {
++				var conntext = '%d total · %d hardware (%d v4, %d v6) · %d software · %d normal'.format(
++					total, hw, v4, v6, sw, total - hw - sw);
++
++				// Bridging is offloaded through PPE switchdev on this image,
++				// so the NSS bridge counter is normally zero. Keep the row
++				// short unless the NSS bridge actually has entries.
++				if (nssb > 0)
++					conntext += ' · NSS bridged %d'.format(nssb);
++
++				fields.push(_('Connections'), conntext);
++			}
 +		}
 +
  		var table = E('table', { 'class': 'table' });
