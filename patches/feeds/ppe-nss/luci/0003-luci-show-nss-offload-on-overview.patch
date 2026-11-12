@@ -46,7 +46,7 @@ index bc1507d..29b84ac 100644
  		call: function(request) {
  			// time() ; Returns the current UNIX epoch.
 diff --git a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
-index 5f079d6..e96959d 100644
+index 5f079d6..edc7177 100644
 --- a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
 +++ b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
 @@ -30,6 +30,16 @@
@@ -112,7 +112,7 @@ index 5f079d6..e96959d 100644
 +			    v4 = +counts[0] || 0,
 +			    v6 = +counts[1] || 0;
 +
-+			fields.push(_('NSS offload'), _('%d flows (%d IPv4, %d IPv6)').format(v4 + v6, v4, v6));
++			fields.push(_('Hardware offload'), _('%d flows (%d IPv4, %d IPv6)').format(v4 + v6, v4, v6));
 +		}
 +
  		var table = E('table', { 'class': 'table' });
