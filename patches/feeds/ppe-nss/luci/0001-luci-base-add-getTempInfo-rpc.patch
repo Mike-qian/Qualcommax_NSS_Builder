@@ -1,15 +1,28 @@
 diff --git a/modules/luci-base/root/usr/share/rpcd/ucode/luci b/modules/luci-base/root/usr/share/rpcd/ucode/luci
-index 73ed50d..209709a 100644
+index 73ed50d..bc1507d 100644
 --- a/modules/luci-base/root/usr/share/rpcd/ucode/luci
 +++ b/modules/luci-base/root/usr/share/rpcd/ucode/luci
-@@ -135,6 +135,24 @@ const methods = {
+@@ -135,6 +135,38 @@
  		}
  	},
  
 +	getTempInfo: {
 +		call: function() {
++			let result = {};
++
++			// Hottest NSS thermal zone; sysfs reports millidegrees Celsius.
++			// Kept independent of /sbin/tempinfo so it also works on images
++			// where that helper is not installed.
++			const nssfd = popen("for z in /sys/class/thermal/thermal_zone*; do grep -q '^nss' \"$z/type\" && cat \"$z/temp\"; done 2>/dev/null | sort -n | tail -n 1 | awk '$1 ~ /^[0-9]+$/ && $1 > 0 { printf \"%d\", int($1 / 1000 + 0.5) }'");
++			if (nssfd) {
++				let nsstemp = nssfd.read('all');
++				nssfd.close();
++				if (nsstemp && trim(nsstemp) != '')
++					result.nsstemp = trim(nsstemp);
++			}
++
 +			if (!access('/sbin/tempinfo'))
-+				return {};
++				return result;
 +
 +			const fd = popen('/sbin/tempinfo');
 +			if (fd) {
@@ -17,11 +30,12 @@ index 73ed50d..209709a 100644
 +				if (!tempinfo)
 +					tempinfo = '?';
 +				fd.close();
-+
-+				return { tempinfo: tempinfo };
++				result.tempinfo = tempinfo;
 +			} else {
-+				return { tempinfo: error() };
++				result.tempinfo = error();
 +			}
++
++			return result;
 +		}
 +	},
  	getUnixtime: {

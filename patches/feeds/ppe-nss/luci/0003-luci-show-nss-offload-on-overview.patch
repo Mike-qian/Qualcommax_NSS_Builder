@@ -1,9 +1,9 @@
 diff --git a/modules/luci-base/root/usr/share/rpcd/ucode/luci b/modules/luci-base/root/usr/share/rpcd/ucode/luci
-index 209709a..8aa7e8b 100644
+index bc1507d..29b84ac 100644
 --- a/modules/luci-base/root/usr/share/rpcd/ucode/luci
 +++ b/modules/luci-base/root/usr/share/rpcd/ucode/luci
-@@ -153,6 +153,25 @@
- 			}
+@@ -167,6 +167,42 @@
+ 			return result;
  		}
  	},
 +	getNssOffload: {
@@ -25,14 +25,31 @@ index 209709a..8aa7e8b 100644
 +		}
 +	},
 +
++	getUsageInfo: {
++		call: function() {
++			// Busy share of the host CPUs and average load of the NSS cores
++			// between two samples one second apart, in percent. The NSS cores
++			// do not appear in /proc/stat; their reports come from debugfs and
++			// are only kept while nss-wifi-drv runs with load=1.
++			const fd = popen("cpu() { awk '/^cpu /{print $2+$3+$4+$5+$6+$7+$8+$9,$5+$6}' /proc/stat; }; nss() { for f in /sys/kernel/debug/*.nss/load; do [ -r \"$f\" ] || continue; echo @@NSS_FILE@@; cat \"$f\" 2>/dev/null; done | awk 'BEGIN{on=0;T=0;K=0} /^@@NSS_FILE@@$/{on=0;next} /^reports 1([^0-9]|$)/{on=1} {if(on&&match($0,/reports [0-9]+ discarded [0-9]+ total [0-9]+/)){x=substr($0,RSTART,RLENGTH);split(x,f,\" \");T+=f[6];K+=f[2]-f[4]}} END{printf \"%d %d\\n\",T,K}'; }; a=$(cpu);b=$(nss);sleep 1;c=$(cpu);d=$(nss);echo $a $c $b $d | awk '{dt=$3-$1;di=$4-$2;cp=(dt>0)?100*(dt-di)/dt:-1;cp=(cp>100)?100:cp;dk=$8-$6;dT=$7-$5;np=(dk>0)?dT/dk:-1;np=(np>100)?100:np;printf \"%d %d\\n\",(cp<0)?-1:int(cp+0.5),(np<0)?-1:int(np+0.5)}'");
++			if (!fd)
++				return {};
++
++			let usage = fd.read('all');
++			fd.close();
++
++			return usage ? { usage: trim(usage) } : {};
++		}
++	},
++
  	getUnixtime: {
  		call: function(request) {
  			// time() ; Returns the current UNIX epoch.
 diff --git a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
-index cc7f0cd..978e22f 100644
+index 5f079d6..e96959d 100644
 --- a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
 +++ b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
-@@ -30,6 +30,11 @@
+@@ -30,6 +30,16 @@
  	method: 'info'
  });
  
@@ -41,33 +58,55 @@ index cc7f0cd..978e22f 100644
 +	method: 'getNssOffload'
 +});
 +
++var callUsageInfo = rpc.declare({
++	object: 'luci',
++	method: 'getUsageInfo'
++});
++
  return baseclass.extend({
  	title: _('System'),
  
-@@ -40,7 +45,8 @@
+@@ -40,6 +50,8 @@
  			L.resolveDefault(callLuciVersion(), { revision: _('unknown version'), branch: 'LuCI' }),
  			L.resolveDefault(callGetUnixtime(), 0),
  			L.resolveDefault(callTempInfo(), {}),
--			uci.load('system')
-+			uci.load('system'),
-+			L.resolveDefault(callNssOffload(), {})
++			L.resolveDefault(callNssOffload(), {}),
++			L.resolveDefault(callUsageInfo(), {}),
+ 			uci.load('system')
  		]);
  	},
- 
-@@ -49,7 +55,8 @@
+@@ -49,7 +61,9 @@
  		    systeminfo  = data[1],
  		    luciversion = data[2],
  		    unixtime    = data[3],
 -		    tempinfo    = data[4];
 +		    tempinfo    = data[4],
-+		    nssinfo     = data[5];
++		    nssinfo     = data[5],
++		    usageinfo   = data[6];
  
  		luciversion = luciversion.branch + ' ' + luciversion.revision;
  
-@@ -90,6 +97,14 @@
- 			fields.splice(7, 0, tempinfo.tempinfo);
- 		}
+@@ -95,6 +109,31 @@
+ 		if (temptext)
+ 			fields.splice(6, 0, _('Temperature'), temptext);
  
++		if (usageinfo && usageinfo.usage) {
++			var u = usageinfo.usage.trim().split(/\s+/),
++			    cpupct = +u[0],
++			    nsspct = +u[1];
++
++			// -1 marks a value that could not be sampled. Skip the row
++			// instead of leaving a permanent '-' in the table (the NSS
++			// cores' load reports are not available on every image).
++			if (u.length == 2) {
++				if (cpupct >= 0)
++					fields.push(_('CPU usage'), '%d%%'.format(cpupct));
++
++				if (nsspct >= 0)
++					fields.push(_('NSS usage'), '%d%%'.format(nsspct));
++			}
++		}
++
 +		if (nssinfo && nssinfo.offload) {
 +			var counts = nssinfo.offload.trim().split(/\s+/),
 +			    v4 = +counts[0] || 0,
@@ -80,15 +119,15 @@ index cc7f0cd..978e22f 100644
  
  		for (var i = 0; i < fields.length; i += 2) {
 diff --git a/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json b/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
-index b3f2cef..d18bac3 100644
+index 9bba9f9..8452418 100644
 --- a/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
 +++ b/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
 @@ -9,7 +9,7 @@
  				"/www/luci-static/resources/view/status/include": [ "list" ]
  			},
  			"ubus": {
--				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats" ],
-+				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats", "getNssOffload" ],
+-				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats", "getTempInfo" ],
++				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats", "getTempInfo", "getNssOffload", "getUsageInfo" ],
  				"file": [ "list", "read" ],
  				"system": [ "board", "info" ]
  			}
