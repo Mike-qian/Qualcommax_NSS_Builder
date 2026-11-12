@@ -1,0 +1,94 @@
+diff --git a/modules/luci-base/root/usr/share/rpcd/ucode/luci b/modules/luci-base/root/usr/share/rpcd/ucode/luci
+index 209709a..8aa7e8b 100644
+--- a/modules/luci-base/root/usr/share/rpcd/ucode/luci
++++ b/modules/luci-base/root/usr/share/rpcd/ucode/luci
+@@ -153,6 +153,25 @@
+ 			}
+ 		}
+ 	},
++	getNssOffload: {
++		call: function() {
++			// Connections offloaded to the PPE and NSS firmware: [HW_OFFLOAD]
++			// conntrack entries plus the bridged, installed flows that
++			// nss-wifi-drv lists under /sys/kernel/debug/*.nss/flows.
++			if (!access('/proc/net/nf_conntrack'))
++				return {};
++
++			const fd = popen("cat /proc/net/nf_conntrack /sys/kernel/debug/*.nss/flows 2>/dev/null | awk 'index($0,\"[HW_OFFLOAD]\") { if ($1==\"ipv4\") v4++; else if ($1==\"ipv6\") v6++ } /^proto / && index($0,\" bridged \") && index($0,\" installed 1 \") { if ($3==\"v4\") v4++; else if ($3==\"v6\") v6++ } END { printf \"%d %d\\n\", v4, v6 }'");
++			if (!fd)
++				return {};
++
++			let counts = fd.read('all');
++			fd.close();
++
++			return counts ? { offload: trim(counts) } : {};
++		}
++	},
++
+ 	getUnixtime: {
+ 		call: function(request) {
+ 			// time() ; Returns the current UNIX epoch.
+diff --git a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+index cc7f0cd..978e22f 100644
+--- a/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
++++ b/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+@@ -30,6 +30,11 @@
+ 	method: 'info'
+ });
+ 
++var callNssOffload = rpc.declare({
++	object: 'luci',
++	method: 'getNssOffload'
++});
++
+ return baseclass.extend({
+ 	title: _('System'),
+ 
+@@ -40,7 +45,8 @@
+ 			L.resolveDefault(callLuciVersion(), { revision: _('unknown version'), branch: 'LuCI' }),
+ 			L.resolveDefault(callGetUnixtime(), 0),
+ 			L.resolveDefault(callTempInfo(), {}),
+-			uci.load('system')
++			uci.load('system'),
++			L.resolveDefault(callNssOffload(), {})
+ 		]);
+ 	},
+ 
+@@ -49,7 +55,8 @@
+ 		    systeminfo  = data[1],
+ 		    luciversion = data[2],
+ 		    unixtime    = data[3],
+-		    tempinfo    = data[4];
++		    tempinfo    = data[4],
++		    nssinfo     = data[5];
+ 
+ 		luciversion = luciversion.branch + ' ' + luciversion.revision;
+ 
+@@ -90,6 +97,14 @@
+ 			fields.splice(7, 0, tempinfo.tempinfo);
+ 		}
+ 
++		if (nssinfo && nssinfo.offload) {
++			var counts = nssinfo.offload.trim().split(/\s+/),
++			    v4 = +counts[0] || 0,
++			    v6 = +counts[1] || 0;
++
++			fields.push(_('NSS offload'), _('%d flows (%d IPv4, %d IPv6)').format(v4 + v6, v4, v6));
++		}
++
+ 		var table = E('table', { 'class': 'table' });
+ 
+ 		for (var i = 0; i < fields.length; i += 2) {
+diff --git a/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json b/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
+index b3f2cef..d18bac3 100644
+--- a/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
++++ b/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
+@@ -9,7 +9,7 @@
+ 				"/www/luci-static/resources/view/status/include": [ "list" ]
+ 			},
+ 			"ubus": {
+-				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats" ],
++				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats", "getNssOffload" ],
+ 				"file": [ "list", "read" ],
+ 				"system": [ "board", "info" ]
+ 			}
