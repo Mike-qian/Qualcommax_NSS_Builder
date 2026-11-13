@@ -29,14 +29,28 @@ echo "feeds.conf.default:"
 cat "$OPENWRT_DIR/feeds.conf.default"
 
 # --- 内核配置: qualcommax target 开启 crypto 用户态 API 与 QCE 硬件加速 ---
-# 删除旧的 CONFIG_CRYPTO_DEV_QCE / CONFIG_CRYPTO_USER_API* (含 =y 与 " is not set" 两种写法),
-# 再统一追加 =y, 确保 IPQ807x 的 QCE 硬件加解密与用户态 crypto API 被编入内核。
 F="$OPENWRT_DIR/target/linux/qualcommax/config-6.18"
 if [ -f "$F" ]; then
-    sed -i -E '/^#? *CONFIG_CRYPTO_DEV_QCE(=| is not set)/d' "$F"
-    sed -i -E '/^#? *CONFIG_CRYPTO_USER_API(_SKCIPHER|_HASH|_AEAD)?(=| is not set)/d' "$F"
-    # 追加 5 行
-    cat >> "$F" <<'EOF'
+    while IFS= read -r line; do
+        # 跳过空行和以 # 开头的注释行
+        [[ -z "$line" || "$line" =~ ^# ]] && continue
+        
+        # 提取配置名（例如 CONFIG_CRYPTO_DEV_QCE）
+        if [[ "$line" =~ ^(CONFIG_[A-Za-z0-9_]+)= ]]; then
+            cfg_name="${BASH_REMATCH[1]}"
+            
+            # 1. 已经是 =y，跳过
+            if grep -q "^${cfg_name}=y" "$F"; then
+                continue
+            # 2. 存在但状态不同（如 =m、=n 或 `# CONFIG_xxx is not set`），修改为 =y
+            elif grep -q -E "^(#\s*)?${cfg_name}(=|\s+is not set)" "$F"; then
+                sed -i -E "s/^#?[[:space:]]*${cfg_name}(=.*|[[:space:]]+is not set).*/${cfg_name}=y/" "$F"
+            # 3. 完全不存在，追加到文件末尾
+            else
+                echo "${cfg_name}=y" >> "$F"
+            fi
+        fi
+    done << 'EOF'
 CONFIG_CRYPTO_DEV_QCE=y
 CONFIG_CRYPTO_DEV_QCE_ENABLE_ALL=y
 CONFIG_ARM64=y
@@ -48,7 +62,6 @@ CONFIG_CRYPTO_AES_ARM64_BS=y
 CONFIG_CRYPTO_AES_ARM64_CE=y
 CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
 CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
-CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
 CONFIG_CRYPTO_SHA1_ARM64_CE=y
 CONFIG_CRYPTO_SHA2_ARM64_CE=y
 CONFIG_CRYPTO_GHASH_ARM64_CE=y
@@ -62,7 +75,6 @@ CONFIG_CRYPTO_USER_API_HASH=y
 CONFIG_CRYPTO_USER_API_AEAD=y
 CONFIG_CRYPTO_AUTHENC=y
 CONFIG_CRYPTO_CBC=y
-#CONFIG_CRYPTO_XTS=y
 CONFIG_CRYPTO_CHACHA20=y
 CONFIG_CRYPTO_POLY1305=y
 CONFIG_CRYPTO_HMAC=y
@@ -75,8 +87,8 @@ CONFIG_ZRAM=y
 CONFIG_ZSMALLOC=y
 CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_BBR=y
-#CONFIG_BPF_JIT_ALWAYS_ON=y
 EOF
+
     echo
     echo "已更新内核配置 $F (crypto 用户态 API + QCE 硬件加速 =y)"
 else
@@ -144,23 +156,15 @@ echo "已写入 files/etc/uci-defaults/996-tz-locale:"
 cat "$UCI_DIR/996-tz-locale"
 
 # --- 首次开机: 修补 luci.upnp 的端口转发解析正则 ---
-# 把 match() 中的 `^\t\tiif` 改为 `^\s*iif`, 并把 `dport ([0-9]+) dnat ip to`
-# 改为 `dport ([0-9]+) .*dnat ip to`, 以兼容 @//nh 接口的端口映射输出格式。
 cat > "$UCI_DIR/997-fix-luci-upnp" << 'EOF'
 #!/bin/sh
-# 修补 /usr/share/rpcd/ucode/luci.upnp 中解析 upnp 端口转发行的正则,
-# 使其对 @//nh 接口的 nft 规则同样生效。
 F="/usr/share/rpcd/ucode/luci.upnp"
 if [ -f "$F" ]; then
-    # 1) `^\t\tiif` -> `^\s*iif` (ucode 正则: \t 单 tab -> \s 任意空白)
-    # 2) `dport ([0-9]+) dnat ip to` -> `dport ([0-9]+) .*dnat ip to`
-    #    用 `) dnat ip to` 这一唯一字面片段做替换, 规避 BRE 中 ()[]+ 的特殊含义。
     sed -i -e 's/\\t\\tiif/\\s*iif/' -e 's/) dnat ip to/) .*dnat ip to/' "$F"
     echo "已修补 $F 的 upnp 解析正则。"
 else
     echo "警告: 未找到 $F, 跳过 luci.upnp 修补。" >&2
 fi
-# 重新加载 rpcd 使改动立即生效 (首次开机时若尚未启动则忽略)。
 [ -x /etc/init.d/rpcd ] && /etc/init.d/rpcd restart 2>/dev/null || true
 EOF
 chmod +x "$UCI_DIR/997-fix-luci-upnp"
