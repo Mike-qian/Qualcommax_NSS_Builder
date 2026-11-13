@@ -28,14 +28,14 @@ echo
 echo "feeds.conf.default:"
 cat "$OPENWRT_DIR/feeds.conf.default"
 
-# --- 内核配置: qualcommax target 开启 crypto 用户态 API 与 QCE 硬件加速 ---
+# --- 内核配置: qualcommax target 开启 ARMv8 CE 软件加速与基础 crypto 选项 ---
 F="$OPENWRT_DIR/target/linux/qualcommax/config-6.18"
 if [ -f "$F" ]; then
     while IFS= read -r line; do
         # 跳过空行和以 # 开头的注释行
         [[ -z "$line" || "$line" =~ ^# ]] && continue
         
-        # 提取配置名（例如 CONFIG_CRYPTO_DEV_QCE）
+        # 提取配置名（例如 CONFIG_CRYPTO_AES_ARM64_CE）
         if [[ "$line" =~ ^(CONFIG_[A-Za-z0-9_]+)= ]]; then
             cfg_name="${BASH_REMATCH[1]}"
             
@@ -51,8 +51,6 @@ if [ -f "$F" ]; then
             fi
         fi
     done << 'EOF'
-CONFIG_CRYPTO_DEV_QCE=y
-CONFIG_CRYPTO_DEV_QCE_ENABLE_ALL=y
 CONFIG_ARM64=y
 CONFIG_KERNEL_MODE_NEON=y
 CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
@@ -69,10 +67,6 @@ CONFIG_CRYPTO_AES=y
 CONFIG_CRYPTO_LIB_AES=y
 CONFIG_CRYPTO_SHA256=y
 CONFIG_CRYPTO_SHA512=y
-CONFIG_CRYPTO_USER_API=y
-CONFIG_CRYPTO_USER_API_SKCIPHER=y
-CONFIG_CRYPTO_USER_API_HASH=y
-CONFIG_CRYPTO_USER_API_AEAD=y
 CONFIG_CRYPTO_AUTHENC=y
 CONFIG_CRYPTO_CBC=y
 CONFIG_CRYPTO_CHACHA20=y
@@ -86,7 +80,7 @@ CONFIG_NF_CONNTRACK_MARK=y
 EOF
 
     echo
-    echo "已更新内核配置 $F (crypto 用户态 API + QCE 硬件加速 =y)"
+    echo "已更新内核配置 $F (ARMv8 CE 软件加速 + 基础 crypto =y)"
 else
     echo "警告: 未找到内核配置文件 $F, 跳过 crypto 配置修改。" >&2
 fi
