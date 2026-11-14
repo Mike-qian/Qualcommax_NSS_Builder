@@ -1,0 +1,54 @@
+{
+ "latest": "ppe-nss-20261113T234656Z-43529618893",
+ "releases": [
+  {
+   "tag": "ppe-nss-20261113T234656Z-43529618893",
+   "time": 1794619691,
+   "groups": [
+    "xiaomi_ax3600"
+   ]
+  },
+  {
+   "tag": "ppe-nss-20261113T203727Z-43503234023",
+   "time": 1794611284,
+   "groups": [
+    "xiaomi_ax3600"
+   ]
+  },
+  {
+   "tag": "ppe-nss-20261113T075023Z-43388597566",
+   "time": 1794562420,
+   "groups": [
+    "xiaomi_ax3600"
+   ]
+  }
+ ],
+ "flavours": {
+  "ppe-nss": {
+   "latest": "ppe-nss-20261113T234656Z-43529618893",
+   "releases": [
+    {
+     "tag": "ppe-nss-20261113T234656Z-43529618893",
+     "time": 1794619691,
+     "groups": [
+      "xiaomi_ax3600"
+     ]
+    },
+    {
+     "tag": "ppe-nss-20261113T203727Z-43503234023",
+     "time": 1794611284,
+     "groups": [
+      "xiaomi_ax3600"
+     ]
+    },
+    {
+     "tag": "ppe-nss-20261113T075023Z-43388597566",
+     "time": 1794562420,
+     "groups": [
+      "xiaomi_ax3600"
+     ]
+    }
+   ]
+  }
+ }
+}
