@@ -193,6 +193,9 @@ jobs:
         with:
           path: builder
 
+      - name: Download emortal packages
+        run: bash builder/scripts/auto.sh "${{ github.workspace }}/openwrt"
+        
       - name: Prepare build environment
         env:
           OPENWRT_DIR: ${{ github.workspace }}/openwrt
@@ -337,6 +340,7 @@ jobs:
           mapfile -t assets < <(find "$out" -maxdepth 1 -type f -name 'openwrt-*-squashfs-sysupgrade.bin')
           [[ ${#assets[@]} -gt 0 ]] || { echo "::error::no sysupgrade images in $out"; exit 1; }
           grep 'sysupgrade.bin' "$out/sha256sums" >"sha256sums-${DEVICE}.txt"
+          cp -f openwrt/.config "config-${DEVICE}.full"
           cp "$out/config.buildinfo" "config-${DEVICE}.buildinfo"
           # The ImageBuilder and the overlay files are what custom.yml builds
           # a picked package set from.
@@ -351,7 +355,7 @@ jobs:
           for attempt in 1 2 3; do
             gh release upload "$TAG" \
               --repo "$GITHUB_REPOSITORY" --clobber \
-              "${assets[@]}" "sha256sums-${DEVICE}.txt" "config-${DEVICE}.buildinfo" && break
+              "${assets[@]}" "sha256sums-${DEVICE}.txt" "config-${DEVICE}.buildinfo" "config-${DEVICE}.full" && break
             [[ $attempt -lt 3 ]] || { echo "::error::upload failed after $attempt attempts"; exit 1; }
             echo "::warning::upload attempt $attempt failed; retrying"
             sleep 15
