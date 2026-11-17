@@ -21,15 +21,15 @@ index 73ed50d..bc1507d 100644
 +					result.nsstemp = trim(nsstemp);
 +			}
 +
-+			if (!access('/sbin/tempinfo'))
-+				return result;
-+
-+			const fd = popen('/sbin/tempinfo');
-+			if (fd) {
-+				let tempinfo = fd.read('all');
++			// CPU/Wi-Fi temperature and CPU frequency, inlined from autocore's
++			// /sbin/tempinfo and /sbin/cpuinfo so the image needs no helper.
++			// Reads thermal_zone0, ieee80211 hwmon and cpufreq policy0 sysfs.
++			const tfd = popen("c=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{printf \"%.1f°C\", $0/1000}'); w=$(cat /sys/class/ieee80211/*/hwmon*/temp1_input 2>/dev/null | awk '{printf \"%.1f°C \", $0/1000}'); f=$(for p in /sys/devices/system/cpu/cpufreq/policy0/cpuinfo_cur_freq /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq; do [ -r \"$p\" ] && cat \"$p\" && break; done 2>/dev/null | awk '{printf \"%.0fMHz\", $0/1000}'); if [ -n \"$c\" ] && [ -n \"$w\" ]; then t=\"CPU: $c WiFi: $w\"; elif [ -n \"$c\" ]; then t=\"CPU: $c\"; elif [ -n \"$w\" ]; then t=\"WiFi: $w\"; else t=\"No temperature info\"; fi; [ -n \"$f\" ] && t=\"${t% } · $f\"; printf '%s' \"$t\"");
++			if (tfd) {
++				let tempinfo = tfd.read('all');
++				tfd.close();
 +				if (!tempinfo)
 +					tempinfo = '?';
-+				fd.close();
 +				result.tempinfo = tempinfo;
 +			} else {
 +				result.tempinfo = error();

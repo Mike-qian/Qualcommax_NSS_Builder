@@ -13,15 +13,15 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 mkdir -p "$OPENWRT_DIR/package/emortal"
 
 # --- emortal 包 ---
-git clone --depth 1 --branch owrt --filter=blob:none --sparse "$REPO" "$TMP_DIR/repo"
-cd "$TMP_DIR/repo"
-git sparse-checkout set package/emortal
-cp -a package/emortal/. "$OPENWRT_DIR/package/emortal/"
+#git clone --depth 1 --branch owrt --filter=blob:none --sparse "$REPO" "$TMP_DIR/repo"
+#cd "$TMP_DIR/repo"
+#git sparse-checkout set package/emortal
+#cp -a package/emortal/. "$OPENWRT_DIR/package/emortal/"
 
 # 删除与 luci feed 同名的包: emortal 这份会变成 core package,
 # 导致 feeds install 不覆盖 luci feed 里正确的版本 (Not overriding core package),
 # 使 CONFIG_PACKAGE_luci-app-qca-ppe-qos=y 在 defconfig 时被丢弃。
-rm -rf "$OPENWRT_DIR/package/emortal/luci-app-qca-ppe-qos"
+#rm -rf "$OPENWRT_DIR/package/emortal/luci-app-qca-ppe-qos"
 
 echo "完成, emortal 包:"
 ls -1 "$OPENWRT_DIR/package/emortal/"
