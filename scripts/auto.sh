@@ -5,6 +5,7 @@ set -euo pipefail
 OPENWRT_DIR="${1:-.}"
 [[ -d "$OPENWRT_DIR" ]] || { echo "错误: 目录不存在: $OPENWRT_DIR" >&2; exit 1; }
 OPENWRT_DIR="$(cd "$OPENWRT_DIR" && pwd)"
+BUILDER_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 REPO="https://github.com/VIKINGYFY/immortalwrt.git"
 TMP_DIR=$(mktemp -d)
@@ -57,12 +58,8 @@ CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
 CONFIG_CRYPTO_CHACHA20_NEON=y
 CONFIG_CRYPTO_POLY1305_NEON=y
 CONFIG_CRYPTO_AES_ARM64_BS=y
-CONFIG_CRYPTO_AES_ARM64_CE=y
-CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
-CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
 CONFIG_CRYPTO_SHA1_ARM64_CE=y
 CONFIG_CRYPTO_SHA2_ARM64_CE=y
-CONFIG_CRYPTO_GHASH_ARM64_CE=y
 CONFIG_CRYPTO_AES=y
 CONFIG_CRYPTO_LIB_AES=y
 CONFIG_CRYPTO_SHA256=y
@@ -83,6 +80,22 @@ EOF
     echo "已更新内核配置 $F (ARMv8 CE 软件加速 + 基础 crypto =y)"
 else
     echo "警告: 未找到内核配置文件 $F, 跳过 crypto 配置修改。" >&2
+fi
+
+# --- 改 builder 仓库里的 999-QOL_config: 注释掉两行 ---
+# 此步在 prepare-build.sh 之前改源文件, 之后 rsync 会把它复制进镜像。
+QOL_FILE="$BUILDER_DIR/devices/common/files/etc/uci-defaults/999-QOL_config"
+if [ -f "$QOL_FILE" ]; then
+    if grep -qxF "set uhttpd.main.redirect_https='1'" "$QOL_FILE"; then
+        sed -i "/^set uhttpd\.main\.redirect_https='1'/s/^/# /" "$QOL_FILE"
+        echo "已注释 999-QOL_config: set uhttpd.main.redirect_https='1'"
+    fi
+    if grep -qxF "uci -q set system.@system[0].qol_defaults='1'" "$QOL_FILE"; then
+        sed -i "/^uci -q set system\.@system\[0\]\.qol_defaults='1'/s/^/# /" "$QOL_FILE"
+        echo "已注释 999-QOL_config: uci -q set system.@system[0].qol_defaults='1'"
+    fi
+else
+    echo "警告: 未找到 $QOL_FILE, 跳过 999-QOL_config 修改。" >&2
 fi
 
 # --- 首次开机: 把 mike-qian kmod feed 替换为官方 OpenWrt snapshots 软件包源 ---
@@ -128,14 +141,24 @@ cat "$UCI_DIR/999-conntrack-max"
 cat > "$UCI_DIR/996-tz-locale" << 'EOF'
 #!/bin/sh
 # 时区设为 Asia/Shanghai (北京时间, CST-8); 日志等级 log_level/conloglevel 6, cronloglevel 5, 系统日志缓冲区 64 KiB。
+# ZRam: 256 MiB 交换空间, lz4 压缩; vm.swappiness=20。
 if command -v uci >/dev/null 2>&1; then
     uci -q set system.@system[0].zonename='Asia/Shanghai'
     uci -q set system.@system[0].timezone='CST-8'
     uci -q set system.@system[0].log_level='6'
     uci -q set system.@system[0].conloglevel='6'
     uci -q set system.@system[0].log_size='64'
+    # zram-swap 的 init 脚本从 system 配置读取大小 (MiB) 与压缩算法。
+    uci -q set system.@system[0].zram_size_mb='256'
+    uci -q set system.@system[0].zram_comp_algo='lz4'
     uci -q commit system
 fi
+# vm.swappiness 写入 /etc/sysctl.conf, 重启后仍生效; 先删旧行再写, 保证幂等。
+if [ -f /etc/sysctl.conf ]; then
+    sed -i '/^[[:space:]]*vm\.swappiness[[:space:]]*=/d' /etc/sysctl.conf
+fi
+echo 'vm.swappiness=20' >> /etc/sysctl.conf
+sysctl -w vm.swappiness=20 >/dev/null 2>&1 || true
 # 立即让配置生效: 重启 log 与 NTP 服务。
 [ -x /etc/init.d/log ] && /etc/init.d/log restart 2>/dev/null || true
 [ -x /etc/init.d/sysntpd ] && /etc/init.d/sysntpd restart 2>/dev/null || true
